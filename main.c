@@ -7,8 +7,13 @@
 /* GPIO Configurations */
 #define RELAY_PORT PA
 #define RELAY_PIN	10
-#define RESULT_LED_PORT PA
-#define RESULT_LED_PIN 11
+#define INFO_LED_PORT PA
+#define INFO_LED_PIN 11
+/* Info actions
+	on: ongoing test
+	off: test cycle is over
+	blinking slow: whole test is over and no problem
+	blinking fast: test is interrupted due to no welcome screen */
 #define RESUME_PORT PA
 #define RESUME_PIN 12
 
@@ -48,10 +53,6 @@ int shippingInit(void);
 unsigned short getLightLevel(void);
 
 struct uartManager serialPort;
-//unsigned int communicationSuccess = 0xE004011B;
-//char communicationSucces[] = { (char)'0xE0', (char)'0x04', (char)'0x01', (char)'0x1B', '\0' };
-
-int light;
 
 int main(void)
 {
@@ -61,10 +62,10 @@ int main(void)
 	char* offsetValue[12] = { "0x0", "0x80000000", "0x100000000", "0x180000000", "0x200000000", "0x280000000" };
 	char filePartSuffix[10] = { "abcdefghi" };
 	
-	
 	setup();
 	for(int trialTime=SHUT_DOWN_START, i=0; trialTime >= SHUT_DOWN_FINAL; i++)
 	{
+		// step 1: print test information
 		valueStr = int2char(trialTime);
 		uart_send(UART_PORT, "\n\nTEST BEGINNING for ");
 		uart_send(UART_PORT, valueStr);
@@ -72,25 +73,24 @@ int main(void)
 		uart_TX(UART_PORT, ENTER_KEY);
 		free(valueStr);
 		
-		// 2nd step: enerjiyi ver
-		write_GP(RESULT_LED_PORT, RESULT_LED_PIN, HIGH);
-		write_GP(RELAY_PORT, RELAY_PIN, LOW);
+		// step 2: TV power on 
+		write_GP(INFO_LED_PORT, INFO_LED_PIN, HIGH);			// test info LED is on: test is ongoing
+		write_GP(RELAY_PORT, RELAY_PIN, LOW);							// power on
 		
-		// 3rd step: Sürekli olarak enter komutu gönder(Ortalama kaç saniyede mboota düstügü hesaplanip o kadar süre + offset bu islem yapilabilir)
+		// step 3: send Enter key at start-up
 		for(int i=0; i < 100*SENDING_ENTER_KEY_TIME; i++)	// send enter key each 10ms
 		{
 			uart_TX(UART_PORT, ENTER_KEY);
 			delayMS(10);
 		}
 		
-		// 4th step: Uart üzerinden usb start komutu gönder.
-		uart_send(UART_PORT, "usb start ");						// send USB start command // usb start <USB_PORT>
-		uart_TX(UART_PORT, USB_PORT);									
-		uart_TX(UART_PORT, ENTER_KEY);
+		// step 4: read USB stick
+		uart_send(UART_PORT, "usb start ");						// "usb start "
+		uart_TX(UART_PORT, USB_PORT);									// "usb start 0"
+		uart_TX(UART_PORT, ENTER_KEY);								// "usb start 0\r"
 		delayMS(4000);																// wait for mainboard to react
 		
-		// 5th step: bin2emmc <usb port number> <binary file name> <offset value> (Her dosyayi tek tek yüklet) (offset value'yu Harun'a sor)
-		// 6th step: Yükleme islemi bittikten sonra reset at.
+		// step 5: send offline burn commands
 		for(int i=0; i <= MAX_FILE_PART_NO; i++)
 		{
 			uart_send(UART_PORT, "bin2emmc ");					// "bin2emmc "
@@ -101,10 +101,13 @@ int main(void)
 			uart_send(UART_PORT, *(offsetValue+i));			// "bin2emmc 0 1 fusion_writeraa 0x80000000"
 			uart_TX(UART_PORT, ';');										// "bin2emmc 0 1 fusion_writeraa 0x80000000;"
 		}
+		
+		// step 6: reset TV after burn
 		uart_send(UART_PORT, "reset");								// send reset command
 		uart_TX(UART_PORT, ENTER_KEY);
 		delayMS(OFFLINE_IMAGE_TO_FACTORY_MODE*60*1000);// wait 19 mins until mainboard is on in factory mode
 		
+		// step 7: power off & on twice to simulate final assambly line
 		write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
 		delayMS(4000);
 		write_GP(RELAY_PORT, RELAY_PIN, LOW);				// turn the power on
@@ -115,32 +118,21 @@ int main(void)
 		write_GP(RELAY_PORT, RELAY_PIN, LOW);				// turn the power on
 		delayMS(120000);
 		
-		// 7th step: Shipping init yap ve gelen loglari text dosyasina kaydetmeye basla.
-		if(shippingInit() == 0)	// plug play den 35 saniye sonra logo geliyor
-		{
-			write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
-			uart_send(UART_PORT, "\n------\noffline image burning FAILED!!\n------\n");
-			while(1)
-			{
-				toggle_GP(RESULT_LED_PORT, RESULT_LED_PIN);
-				delayMS(3000);
-			}
-		}
-			
-		
-		// 8th step: trialTime süresi kadar sonra enerjiyi kes
+		// step 8: send shipping init (plug&play) command
+		shippingInit();	// brand logo appears after command 35 secs later
+
+		// step 9: wait defined test period and power off and on TV
 		delayMS(trialTime);
 		write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
 		delayMS(3000);
-		
-		// 9th step: enerji ver
 		write_GP(RELAY_PORT, RELAY_PIN, LOW);				// turn the power on
 		
-		// 10th step: LDR'den gelen veriyi x dakika kadar oku eger degisim olursa en basa dön (i++; logu durdur;), olmazsa exit at.
+		// step 10: sense the light of the specific pixels of screen
 		delayMS(WELCOME_SCREEN_TIME*1000);
 		value = getLightLevel();
-
-		if(value <= LIGHT_THRESHOLD)
+		
+		// step 11: decide if welcome screen appeared or not
+		if(value <= LIGHT_THRESHOLD) // Welcome screen arrived
 		{
 			valueStr = int2char(trialTime);
 			uart_send(UART_PORT, "\nTEST OK for ");
@@ -149,7 +141,7 @@ int main(void)
 			free(valueStr);
 			testResult = 1;
 		}
-		else	// PROBLEM OCCURED !!
+		else	// no welcome screen! PROBLEM OCCURED !!
 		{
 			valueStr = int2char(trialTime);
 			uart_send(UART_PORT, "\nTEST FAILED for ");
@@ -160,58 +152,43 @@ int main(void)
 			testResult = 0;
 		}
 		
-		write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
-		write_GP(RESULT_LED_PORT, RESULT_LED_PIN, LOW);
+		// step 12: power off TV
+		write_GP(RELAY_PORT, RELAY_PIN, HIGH);				// turn the power off
+		write_GP(INFO_LED_PORT, INFO_LED_PIN, LOW);		// test info LED is off: test is over
 		delayMS(4000);
 		
+		// step 13: check if the test is repated as many as defined
 		if(i == TEST_CYCLE){
 			i = 0;
 			trialTime -= SHUT_DOWN_STEP;
 		}
 		
-		if(testResult == 0) // TEST FAILED
-			while(read_GP(RESUME_PORT, RESUME_PIN) == 0)
+		if(testResult == 0) 													// no welcome screen
+			while(read_GP(RESUME_PORT, RESUME_PIN) == 0)// until tester's resume signal, wait unlimited time
 			{
-				toggle_GP(RESULT_LED_PORT, RESULT_LED_PIN);
+				toggle_GP(INFO_LED_PORT, INFO_LED_PIN);		// test info LED is blinking fast: no welcome screen
 				delayMS(100);
 			}
-
-//		while(1)
-//		{
-//			light = getLightLevel();
-//			valueStr = int2char(light); // for debug
-//			uart_send(UART_PORT, valueStr); // for debug
-//			uart_TX(UART_PORT, ENTER_KEY); // for debug
-//			free(valueStr);
-//		}
 	}
-	while(1)		// TEST IS DONE SUCCESSFULLY
+	
+	while(1)																				// TEST IS DONE SUCCESSFULLY
 	{
-		toggle_GP(RESULT_LED_PORT, RESULT_LED_PIN);
+		toggle_GP(INFO_LED_PORT, INFO_LED_PIN);				// test info LED is blinking slow: test is over and no problem occured
 		delayMS(1000);
 	}
-//	while(1)
-//	if(serialPort.signal == 1)	// TRUE once we have uart message
-//	{
-//		// gelen mesaja dair islem
-//		
-//		uart_send(2,serialPort.message); 
-//		serialPort.signal = 0;
-//		str_empty(serialPort.message);
-//	}
 		
 	return 0;
 }
 
 void setup(void)
 {
-	systick_init();																			// for systick delays
-	gpio_init(RELAY_PORT, RELAY_PIN, OUT10, OUT_GP_PP);	// initilize GPIO for relay
-	write_GP(RELAY_PORT, RELAY_PIN, HIGH);								// condition on start
-	gpio_init(RESULT_LED_PORT, RESULT_LED_PIN, OUT10, OUT_GP_PP);	// initilize GPIO for result LED
-	write_GP(RESULT_LED_PORT, RESULT_LED_PIN, LOW);								// condition on start
-	adc_init(ADC_PORT, LDR_PORT, LDR_PIN);							// initilize ADC for LDR
-	uart_init(UART_PORT, UART_SPEED);										// initilize uart for communication with TV mainboard
+	systick_init();																						// for systick delays
+	gpio_init(RELAY_PORT, RELAY_PIN, OUT10, OUT_GP_PP);				// initilize GPIO for relay
+	write_GP(RELAY_PORT, RELAY_PIN, HIGH);										// condition on start
+	gpio_init(INFO_LED_PORT, INFO_LED_PIN, OUT10, OUT_GP_PP);	// initilize GPIO for result LED
+	write_GP(INFO_LED_PORT, INFO_LED_PIN, LOW);								// condition on start
+	adc_init(ADC_PORT, LDR_PORT, LDR_PIN);										// initilize ADC for LDR
+	uart_init(UART_PORT, UART_SPEED);													// initilize uart for communication with TV mainboard
 	delayMS(100);
 	
 	/* uart comfigurations */
