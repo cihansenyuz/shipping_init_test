@@ -31,7 +31,7 @@
 #define UART_SPEED 115200
 
 /* Mainboard Communication Configurations 
-	start session E0 04 01 1A  ==> answer: E0 04 01 1B
+	start session E0 04 01 1A  ==> answer: E0 04 00 1B
 	plug play E0 04 6C AF */
 #define ENTER_KEY '\r'
 #define USB_PORT '0'
@@ -39,12 +39,12 @@
 #define MAX_FILE_PART_NO 6
 
 /* Test Conditions */
-#define SHUT_DOWN_START 39000							// in ms		// first iteration of test
+#define SHUT_DOWN_START 42000							// in ms		// first iteration of test
 #define SHUT_DOWN_STEP 500								// in ms		// iteration steps
 #define SHUT_DOWN_FINAL 35000							// in ms		// last iteration of test
-#define SENDING_ENTER_KEY_TIME 1					// in secs 	// how long enter key will be sent after power on time
+#define SENDING_ENTER_KEY_TIME 2					// in secs 	// how long enter key will be sent after power on time
 #define WELCOME_SCREEN_TIME 120						// in secs 	// how long will be waited after plug play to check LDR
-#define TEST_CYCLE 5
+#define TEST_CYCLE 3
 #define OFFLINE_IMAGE_TO_FACTORY_MODE 20	// in mins	// burning offline and turning on in factory mode
 
 
@@ -53,6 +53,8 @@ int shippingInit(void);
 unsigned short getLightLevel(void);
 
 struct uartManager serialPort;
+char communicationSuccess[4] = { (char)0xE0, (char)0x04, (char)0x00, (char)0x1B };
+char uartListen = 0;									// to prevent long uart recieve interrupts during sending uart datas 
 
 int main(void)
 {
@@ -61,9 +63,10 @@ int main(void)
 	char* valueStr;
 	char* offsetValue[12] = { "0x0", "0x80000000", "0x100000000", "0x180000000", "0x200000000", "0x280000000" };
 	char filePartSuffix[10] = { "abcdefghi" };
+
 	
 	setup();
-	for(int trialTime=SHUT_DOWN_START, i=0; trialTime >= SHUT_DOWN_FINAL; i++)
+	for(int trialTime=SHUT_DOWN_START, i=1; trialTime >= SHUT_DOWN_FINAL; i++)
 	{
 		// step 1: print test information
 		valueStr = int2char(trialTime);
@@ -91,7 +94,7 @@ int main(void)
 		delayMS(4000);																// wait for mainboard to react
 		
 		// step 5: send offline burn commands
-		for(int i=0; i <= MAX_FILE_PART_NO; i++)
+		for(int i=0; i < MAX_FILE_PART_NO; i++)
 		{
 			uart_send(UART_PORT, "bin2emmc ");					// "bin2emmc "
 			uart_TX(UART_PORT, USB_PORT);								// "bin2emmc 0"
@@ -105,21 +108,30 @@ int main(void)
 		// step 6: reset TV after burn
 		uart_send(UART_PORT, "reset");								// send reset command
 		uart_TX(UART_PORT, ENTER_KEY);
-		delayMS(OFFLINE_IMAGE_TO_FACTORY_MODE*60*1000);// wait 19 mins until mainboard is on in factory mode
+		delayMS(OFFLINE_IMAGE_TO_FACTORY_MODE*60*1000);// wait until mainboard is on in factory mode
 		
 		// step 7: power off & on twice to simulate final assambly line
 		write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
 		delayMS(4000);
 		write_GP(RELAY_PORT, RELAY_PIN, LOW);				// turn the power on
-		delayMS(120000);
+		delayMS(70000);
 		
 		write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
 		delayMS(4000);
 		write_GP(RELAY_PORT, RELAY_PIN, LOW);				// turn the power on
-		delayMS(120000);
+		delayMS(90000);
 		
 		// step 8: send shipping init (plug&play) command
-		shippingInit();	// brand logo appears after command 35 secs later
+		if(shippingInit() == 0)
+		{
+			write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
+			uart_send(UART_PORT, "\n------\noffline image burning FAILED!!\n------\n");
+			while(1)
+			{
+				toggle_GP(INFO_LED_PORT, INFO_LED_PIN);
+				delayMS(3000);
+			}
+		}
 
 		// step 9: wait defined test period and power off and on TV
 		delayMS(trialTime);
@@ -137,7 +149,7 @@ int main(void)
 			valueStr = int2char(trialTime);
 			uart_send(UART_PORT, "\nTEST OK for ");
 			uart_send(UART_PORT, valueStr);
-			uart_send(UART_PORT, " ms trial time\n");
+			uart_send(UART_PORT, " ms trial time\n\n Welcome screen arrived\n");
 			free(valueStr);
 			testResult = 1;
 		}
@@ -146,7 +158,7 @@ int main(void)
 			valueStr = int2char(trialTime);
 			uart_send(UART_PORT, "\nTEST FAILED for ");
 			uart_send(UART_PORT, valueStr);
-			uart_send(UART_PORT, " ms trial time\n");
+			uart_send(UART_PORT, " ms trial time\n\n NO WELCOME SCREEN!!\n");
 			uart_TX(UART_PORT, ENTER_KEY);
 			free(valueStr);
 			testResult = 0;
@@ -157,26 +169,30 @@ int main(void)
 		write_GP(INFO_LED_PORT, INFO_LED_PIN, LOW);		// test info LED is off: test is over
 		delayMS(4000);
 		
-		// step 13: check if the test is repated as many as defined
-		if(i == TEST_CYCLE){
-			i = 0;
-			trialTime -= SHUT_DOWN_STEP;
-		}
-		
+		if(testResult == 1)
+			uart_send(UART_PORT, "\nTest cycle is done\n\n ");
 		if(testResult == 0) 													// no welcome screen
 			while(read_GP(RESUME_PORT, RESUME_PIN) == 0)// until tester's resume signal, wait unlimited time
 			{
 				toggle_GP(INFO_LED_PORT, INFO_LED_PIN);		// test info LED is blinking fast: no welcome screen
 				delayMS(100);
 			}
+		
+		// step 13: check if the test is repated as many times as defined
+		if(i == TEST_CYCLE){
+			i = 0;
+			trialTime -= SHUT_DOWN_STEP;
+		}
 	}
 	
-	while(1)																				// TEST IS DONE SUCCESSFULLY
+	// TEST IS DONE SUCCESSFULLY
+	uart_send(UART_PORT, "\n------\nAll tests are done and no fail occurred\n------\n");
+	while(1)																				
 	{
 		toggle_GP(INFO_LED_PORT, INFO_LED_PIN);				// test info LED is blinking slow: test is over and no problem occured
 		delayMS(1000);
 	}
-		
+	
 	return 0;
 }
 
@@ -189,18 +205,21 @@ void setup(void)
 	write_GP(INFO_LED_PORT, INFO_LED_PIN, LOW);								// condition on start
 	adc_init(ADC_PORT, LDR_PORT, LDR_PIN);										// initilize ADC for LDR
 	uart_init(UART_PORT, UART_SPEED);													// initilize uart for communication with TV mainboard
+	__NVIC_DisableIRQ(USART2_IRQn);														// prevent uart to interrupt main functions
 	delayMS(100);
 	
 	/* uart comfigurations */
 	serialPort.mode = 0; 					/* 0: process /// 1/2/3: brigde to uart1/2/3 */
 	serialPort.signal = 0;				/* message recieved signal */
-	serialPort.strategy = 1; 			/* 1:terminator /// 0:interrupt */
-	serialPort.terminator = '\n';
+	serialPort.strategy = 0; 			/* 1:terminator /// 0:interrupt */
+	serialPort.timeCounter = 200;
 }
 
 int shippingInit(void)
-{
-	serialPort.signal = 0;
+{									
+	
+	__NVIC_EnableIRQ(USART2_IRQn);														// let uart to interrupt
+	
 	str_empty(serialPort.message);
 	
 	/* start session command */
@@ -208,8 +227,11 @@ int shippingInit(void)
 	uart_TX_hex(UART_PORT, 0x04);
 	uart_TX_hex(UART_PORT, 0x01);
 	uart_TX_hex(UART_PORT, 0x1A);
-	delayMS(1000);
-//	if(serialPort.signal == 1 && str_exact(serialPort.message, communicationSuccess) )
+	
+	delayMS(100);
+	__NVIC_DisableIRQ(USART2_IRQn);														// prevent uart to interrupt main functions
+	
+	if(str_exact(serialPort.message, communicationSuccess))
 	{
 		/* plug play command */
 		uart_TX_hex(UART_PORT, 0xE0);
@@ -218,7 +240,7 @@ int shippingInit(void)
 		uart_TX_hex(UART_PORT, 0xAF);
 		return 1;
 	}
-//	return 0;
+	return 0;
 }
 
 unsigned short getLightLevel(void)
@@ -238,5 +260,10 @@ unsigned short getLightLevel(void)
 
 void USART2_IRQHandler(void)
 {
-	uart_ISR(UART_PORT, &serialPort);
+		uart_ISR(UART_PORT, &serialPort);
+}
+
+void SysTick_Handler(void)
+{
+		systick_interrupt(&serialPort);
 }

@@ -198,6 +198,7 @@ void uart_ISR(unsigned short uart, struct uartManager* uartMan)
 			/* timer strategy (interrupt) */
 			uartMan->count++;
 			uartMan->timeCounter = uartMan->timeConstant;
+			
 			systick_interrup_start();
 		}
 	}
@@ -229,7 +230,7 @@ void uart_message(unsigned short uart, char str[], struct uartManager* uartMan)
 	uartMan->signal = 0;
 }
 
-void systick_interrupt(struct uartManager* uart1Man, struct uartManager* uart2Man, struct uartManager* uart3Man)
+void systick_interrupt(struct uartManager* uart1Man)
 {
 	if(uart1Man->count != 0)
 	{
@@ -244,7 +245,7 @@ void systick_interrupt(struct uartManager* uart1Man, struct uartManager* uart2Ma
 		{
 			uart1Man->timeCounter--;
 		}
-	}
+	}/*
 	else if(uart2Man->count != 0)
 	{
 		if(uart2Man->timeCounter == 0)
@@ -252,7 +253,7 @@ void systick_interrupt(struct uartManager* uart1Man, struct uartManager* uart2Ma
 			uart2Man->count = 0;
 			uart2Man->signal = 1;
 			uart2Man->timeConstant = 0;
-			systick_init(); /* to stop interrupt */
+			systick_init(); // to stop interrupt
 		}
 		else
 		{
@@ -266,11 +267,11 @@ void systick_interrupt(struct uartManager* uart1Man, struct uartManager* uart2Ma
 			uart3Man->count = 0;
 			uart3Man->signal = 1;
 			uart3Man->timeConstant = 0;
-			systick_init(); /* to stop interrupt */
+			systick_init(); // to stop interrupt
 		}
 		else
 		{
 			uart3Man->timeCounter--;
 		}
-	}
+	}*/
 }
