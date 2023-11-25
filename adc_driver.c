@@ -93,7 +93,7 @@ int adc_get(char adc, short port, short pin)
 	{
 		data = ADC2->DR;
 	}
-	result = (data*1000/0xfff);
+	result = (data*3200/4096) /* to range it between 3V2 and 0V */ + 40 /* for calibration */;
 	return result;
 }
 

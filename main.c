@@ -18,10 +18,13 @@
 #define RESUME_PIN 12
 
 /* ADC Configurations */
-#define ADC_PORT 1
-#define LDR_PORT PA
-#define LDR_PIN 1
-#define LIGHT_THRESHOLD 230
+#define ADC_LDR_PORT 1
+#define LDR_WELCOME_PORT PA
+#define LDR_WELCOME_PIN 1
+#define ADC_LOGO_PORT 2
+#define LDR_LOGO_PORT PA
+#define LDR_LOGO_PIN 2
+#define LIGHT_THRESHOLD 300 // android logo screen: below 100, welcome screen: over 350, no BL: below 250
 
 /* UART Configurations */
 /*
@@ -39,12 +42,12 @@
 #define MAX_FILE_PART_NO 6
 
 /* Test Conditions */
-#define SHUT_DOWN_START 42000							// in ms		// first iteration of test
+#define SHUT_DOWN_START 50000							// in ms		// first iteration of test
 #define SHUT_DOWN_STEP 500								// in ms		// iteration steps
 #define SHUT_DOWN_FINAL 35000							// in ms		// last iteration of test
 #define SENDING_ENTER_KEY_TIME 2					// in secs 	// how long enter key will be sent after power on time
 #define WELCOME_SCREEN_TIME 120						// in secs 	// how long will be waited after plug play to check LDR
-#define TEST_CYCLE 3
+#define TEST_CYCLE 1
 #define OFFLINE_IMAGE_TO_FACTORY_MODE 20	// in mins	// burning offline and turning on in factory mode
 
 
@@ -70,7 +73,7 @@ int main(void)
 	{
 		// step 1: print test information
 		valueStr = int2char(trialTime);
-		uart_send(UART_PORT, "\n\nTEST BEGINNING for ");
+		uart_send(UART_PORT, "\n\nStarting new cycle...\nTEST BEGINNING for ");
 		uart_send(UART_PORT, valueStr);
 		uart_send(UART_PORT, " ms trial time\n");
 		uart_TX(UART_PORT, ENTER_KEY);
@@ -112,14 +115,15 @@ int main(void)
 		
 		// step 7: power off & on twice to simulate final assambly line
 		write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
+		uart_send(UART_PORT, "/nBurning image process from usb is over.");
 		delayMS(4000);
 		write_GP(RELAY_PORT, RELAY_PIN, LOW);				// turn the power on
-		delayMS(70000);
+		delayMS(90000);
 		
 		write_GP(RELAY_PORT, RELAY_PIN, HIGH);			// turn the power off
 		delayMS(4000);
 		write_GP(RELAY_PORT, RELAY_PIN, LOW);				// turn the power on
-		delayMS(90000);
+		delayMS(120000);
 		
 		// step 8: send shipping init (plug&play) command
 		if(shippingInit() == 0)
@@ -146,12 +150,13 @@ int main(void)
 		// step 11: decide if welcome screen appeared or not
 		if(value <= LIGHT_THRESHOLD) // Welcome screen arrived
 		{
-			valueStr = int2char(trialTime);
+			valueStr = int2char(getLightLevel());
 			uart_send(UART_PORT, "\nTEST OK for ");
 			uart_send(UART_PORT, valueStr);
-			uart_send(UART_PORT, " ms trial time\n\n Welcome screen arrived\n");
+			uart_send(UART_PORT, " ms trial time\n Welcome screen arrived\n");
 			free(valueStr);
 			testResult = 1;
+			delayMS(1000);
 		}
 		else	// no welcome screen! PROBLEM OCCURED !!
 		{
@@ -203,7 +208,8 @@ void setup(void)
 	write_GP(RELAY_PORT, RELAY_PIN, HIGH);										// condition on start
 	gpio_init(INFO_LED_PORT, INFO_LED_PIN, OUT10, OUT_GP_PP);	// initilize GPIO for result LED
 	write_GP(INFO_LED_PORT, INFO_LED_PIN, LOW);								// condition on start
-	adc_init(ADC_PORT, LDR_PORT, LDR_PIN);										// initilize ADC for LDR
+	adc_init(ADC_LDR_PORT, LDR_WELCOME_PORT, LDR_WELCOME_PIN);										// initilize ADC for Welcome LDR
+	adc_init(ADC_LOGO_PORT, LDR_LOGO_PORT, LDR_LOGO_PIN);										// initilize ADC for Logo LDR
 	uart_init(UART_PORT, UART_SPEED);													// initilize uart for communication with TV mainboard
 	__NVIC_DisableIRQ(USART2_IRQn);														// prevent uart to interrupt main functions
 	delayMS(100);
@@ -245,12 +251,12 @@ int shippingInit(void)
 
 unsigned short getLightLevel(void)
 {
-	unsigned short sumData;
+	unsigned short sumData = 0;
 	
 	for(int i=0; i<100;){
-		if(adc_check(ADC_PORT, LDR_PORT, LDR_PIN)){
+		if(adc_check(ADC_LDR_PORT, LDR_WELCOME_PORT, LDR_WELCOME_PIN)){
 			i++;
-			sumData += adc_get(ADC_PORT, LDR_PORT, LDR_PIN);
+			sumData += adc_get(ADC_LDR_PORT, LDR_WELCOME_PORT, LDR_WELCOME_PIN);
 			
 		}
 		delayMS(10);
