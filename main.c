@@ -49,7 +49,7 @@
 
 
 void setup(void);
-int shippingInit(void);
+void shippingInit(void);
 unsigned short getLightLevel(void);
 
 struct uartManager serialPort;
@@ -198,27 +198,20 @@ void setup(void)
 	serialPort.terminator = '\n';
 }
 
-int shippingInit(void)
+void shippingInit(void)
 {
-	serialPort.signal = 0;
-	str_empty(serialPort.message);
-	
 	/* start session command */
 	uart_TX_hex(UART_PORT, 0xE0);
 	uart_TX_hex(UART_PORT, 0x04);
 	uart_TX_hex(UART_PORT, 0x01);
 	uart_TX_hex(UART_PORT, 0x1A);
 	delayMS(1000);
-//	if(serialPort.signal == 1 && str_exact(serialPort.message, communicationSuccess) )
-	{
-		/* plug play command */
-		uart_TX_hex(UART_PORT, 0xE0);
-		uart_TX_hex(UART_PORT, 0x04);
-		uart_TX_hex(UART_PORT, 0x6C);
-		uart_TX_hex(UART_PORT, 0xAF);
-		return 1;
-	}
-//	return 0;
+	
+	/* plug play command */
+	uart_TX_hex(UART_PORT, 0xE0);
+	uart_TX_hex(UART_PORT, 0x04);
+	uart_TX_hex(UART_PORT, 0x6C);
+	uart_TX_hex(UART_PORT, 0xAF);
 }
 
 unsigned short getLightLevel(void)
