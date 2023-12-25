@@ -13,6 +13,7 @@ Before starting the test, must follow the below instructions list
 - Build the project and upload it to STM32.
 - Open a serial port on a PC and connect it to UART TX of the MCU board to see test information logs.
 - Open another serial port on PC and connect it UART TX of the TV to see logs of the mainboard.
+- Prepare the setup by doing all hardware connections. Use the "schematics.pdf" file for reference.
 - Once the hardware setup connection is ready, power it to run the test.
 
 Project photos, schematics, and flow charts can be found in the "Project Documentation" folder.
