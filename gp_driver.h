@@ -45,7 +45,41 @@
 #define LOW 0
 #define HIGH 1
 
+/* 
+* Enables GPIO port and initializes pin configuration
+*
+* @param port desired GPIO port
+* @param pin pin number of the port
+* @param dir input/output direction, see header file
+* @param opt options for the direction, see header file
+* @return none
+*/
 void gpio_init (unsigned short port, unsigned short pin, unsigned dir, unsigned short opt);
+
+/* 
+* Reads GPIO pin state
+*
+* @param port desired GPIO port
+* @param pin pin number of the port
+* @return 1 or 0 corresponding HIGH or LOW
+*/
 int read_GP (unsigned short port, unsigned short pin);
+
+/* 
+* Outputs desired logic state from GPIO pin
+*
+* @param port desired GPIO port
+* @param pin pin number of the port
+* @param state desired logic state
+* @return none
+*/
 void write_GP (unsigned short port, unsigned short pin, unsigned short state);
+
+/* 
+* Outputs the opposite of current logic state of GPIO pin
+*
+* @param port desired GPIO port
+* @param pin pin number of the port
+* @return none
+*/
 void toggle_GP (unsigned short port, unsigned short pin);

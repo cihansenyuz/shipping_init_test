@@ -39,12 +39,83 @@ struct uartManager
 	char message[2000];			  /* message holder */
 };
 
+/* 
+* Writes all bytes given as string to the selected uart port
+*
+* @param usart selected uart port
+* @param str string to be send
+* @return none
+*/
 void uart_send(unsigned short uart, char str[]);
+
+/* 
+* Provides uart message management according to mode, strategy, terminator, timeConstant sets once there is uart interrupt
+*
+* @param usart selected uart port
+* @param uartMan uart configuration sets
+* @return none
+*/
 void uart_ISR(unsigned short uart, struct uartManager* uartMan);
+
+/* 
+* Calculates BBR value to meet selected baud rate
+*
+* @param usart selected uart port
+* @param BR selected baud rate
+* @return calculated BBR value
+*/
 unsigned long USART_BRR(unsigned short usart, unsigned long BR);
+
+/* 
+* Configurates selected uart with interrupt and selected baud rate
+*
+* @param usart selected uart port
+* @param BR selected baud rate
+* @return none
+*/
 void uart_init(unsigned short usart, unsigned long BR);
+
+/* 
+* Reads one byte from the selected uart port
+*
+* @param usart selected uart port
+* @return recieved char 
+*/
 char uart_RX(unsigned short uart);
+
+/* 
+* Writes one byte to the selected uart port
+*
+* @param usart selected uart port
+* @param c char to send
+* @return none
+*/
 void uart_TX(unsigned short uart, char c);
+
+/* 
+* Writes all bytes given as string to the selected uart port and gives some interval for a reply
+*
+* @param usart selected uart port
+* @param str string to be send
+* @param uartMan uart configuration sets
+* @return none
+* @note if time interval is not enough, change timeOut variable manually
+*/
 void uart_message(unsigned short uart, char str[], struct uartManager* uartMan);
-void systick_interrupt(struct uartManager* uart1Man, struct uartManager* uart2Man,struct uartManager* uart3Man);
+
+/* 
+* Creates delay according to uart manager time constant
+*
+* @param uartMan uart configuration sets
+* @return none
+*/
+void systick_interrupt(struct uartManager* uartMan);
+
+/* 
+* Writes one byte to the selected uart port
+*
+* @param usart selected uart port
+* @param hex byte in hexadecimal to be send
+* @return none
+*/
 void uart_TX_hex(unsigned short uart, unsigned short hex);

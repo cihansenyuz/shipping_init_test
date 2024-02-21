@@ -85,6 +85,8 @@ void str_merge(char str1[], char str2[])
 *
 * @param num number to be converted
 * @return char* to new string that is created
+* @note ATTENTION! this function allocates memory for returned char*
+* Do not forget to deallocate it after you use.
 */
 char* int2char(unsigned int num)
 {
@@ -115,9 +117,6 @@ char* int2char(unsigned int num)
 *
 * @param str string number to be converted
 * @return new integer number that is created
-*
-* @note ATTENTION! this function allocates memory for returned char*
-* Do not forget to deallocate it after you use.
 */
 int char2int(char str[])
 {

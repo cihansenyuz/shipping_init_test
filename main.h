@@ -82,6 +82,26 @@
 #define TEST_CYCLE 5
 #define OFFLINE_IMAGE_TO_FACTORY_MODE 20	// in mins	// burning offline and turning on in factory mode
 
+/* 
+* Configurates and initiliazes necessary GPIOs, UART, ADC.
+*
+* @param none
+* @return none
+*/
 void setup(void);
+
+/* 
+* Sends hexadecimal commands to UART to set TV shipping mode
+*
+* @param none
+* @return none
+*/
 void shippingInit(void);
+
+/* 
+* Reads ADC value 100 times in a second, and calculates the average.
+*
+* @param none
+* @return value of ADC
+*/
 unsigned short getLightLevel(void);

@@ -36,6 +36,33 @@
 #define adc1	1
 #define adc2	2
 
+/* 
+* Configurates GPIO port, pin and ADC to initiliaze
+*
+* @param adc desired ADC
+* @param port GPIO port to be used
+* @param pin GPIO pin to be used
+* @return 1: successful, 0: given GPIO port/pin does not match with ADC channels
+*/
 char adc_init(char adc, short port, short pin);
+
+/* 
+* Checks if value read from ADC is ready to be taken.
+*
+* @param adc desired ADC
+* @param port GPIO port to be used
+* @param pin GPIO pin to be used
+* @return 1: data is ready, 0: not ready
+*/
 char adc_check(char adc, short port, short pin);
+
+/* 
+* Gets the ADC value
+*
+* @param adc desired ADC
+* @param port GPIO port to be used
+* @param pin GPIO pin to be used
+* @return 1: data is read, 0: data couldnot be read
+* @note Use adc_check() function before to use this function to be sure that data is ready to be read.
+*/
 int adc_get(char adc, short port, short pin);
